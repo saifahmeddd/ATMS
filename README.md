@@ -45,35 +45,53 @@ A full-stack Training Management System built for **Almnfthen Business Services*
 
 - **Node.js** 18.17 or later — [Download](https://nodejs.org)
 - **npm** 9+ (bundled with Node.js)
-- A **PostgreSQL** database — the project is pre-configured to use the hosted Neon database included in the `.env` file. No local database installation is required.
+- A **PostgreSQL** database — use a free hosted database from [Neon](https://neon.tech) or [Supabase](https://supabase.com), or run PostgreSQL locally
 
 ---
 
 ## Quick Start
 
-Follow these four steps to get the application running locally.
+Follow these steps to get the application running locally after cloning the repository.
 
-### 1. Install dependencies
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/saifahmeddd/ATMS.git
+cd ATMS
+```
+
+### 2. Install dependencies
 
 ```bash
 npm install
 ```
 
-### 2. Configure environment variables
+> This also auto-generates the Prisma client via the `postinstall` script.
 
-A ready-to-use `.env` file is already included in the project with a live hosted database connection. No changes are needed to run the project locally.
+### 3. Configure environment variables
 
-> If you need to use your own database, copy `.env.example` to `.env` and fill in your values (see [Environment Variables](#environment-variables)).
-
-### 3. Set up the database
+Copy the example environment file and fill in your values:
 
 ```bash
-npm run db:generate   # Generate the Prisma client
-npm run db:migrate    # Apply database migrations
-npm run db:seed       # Seed demo accounts and sample data
+cp .env.example .env
 ```
 
-### 4. Start the development server
+Open `.env` and set the required variables:
+
+- **`DATABASE_URL`** — Your PostgreSQL connection string. You can use a free hosted database from [Neon](https://neon.tech), [Supabase](https://supabase.com), or a local PostgreSQL instance.
+- **`AUTH_SECRET`** — Generate one by running `npx auth secret` or `openssl rand -base64 32`.
+- **`AUTH_URL`** — Set to `http://localhost:3000` (must match the port you run the server on).
+
+See [Environment Variables](#environment-variables) for the full list.
+
+### 4. Set up the database
+
+```bash
+npm run db:migrate    # Create all tables by running the migration history
+npm run db:seed       # Insert demo accounts and sample data
+```
+
+### 5. Start the development server
 
 ```bash
 npm run dev
@@ -108,14 +126,19 @@ You will be redirected to the login page. Use the credentials below to sign in.
 
 ## Database Setup
 
-The project uses **Prisma** for database management. All migrations are already applied to the hosted Neon database included in the `.env` file.
+The project uses **Prisma** for database management. You need a PostgreSQL database to run the application. Free hosted options include [Neon](https://neon.tech) and [Supabase](https://supabase.com), or you can use a local PostgreSQL instance.
 
-If you are connecting to a fresh database, run the following commands in order:
+After setting `DATABASE_URL` in your `.env` file, run:
 
 ```bash
-npm run db:generate   # Compile the Prisma client from schema.prisma
 npm run db:migrate    # Create all tables by running the migration history
 npm run db:seed       # Insert demo users, a sample course, quiz, and enrolment
+```
+
+The Prisma client is auto-generated during `npm install` (via the `postinstall` script). If you need to regenerate it manually:
+
+```bash
+npm run db:generate
 ```
 
 To inspect the database visually:
@@ -231,8 +254,6 @@ After running `npm run db:seed`, the following accounts are available:
 │       └── utils.ts           # Tailwind class utility (cn)
 ├── tests/                     # Integration test suites
 ├── docs/                      # Documentation and ERD diagram
-├── html-pages/                # Original HTML/CSS mockups (reference only)
-├── .env                       # Environment variables (live DB included)
 ├── .env.example               # Environment variable template
 └── package.json
 ```
@@ -431,13 +452,13 @@ This is almost always caused by an `AUTH_URL` mismatch (see above). Verify that 
 
 ### `npm run db:migrate` fails or Prisma client errors
 
-If you see a Prisma client error like `PrismaClientInitializationError`, run:
+If you see a Prisma client error like `PrismaClientInitializationError`, ensure `DATABASE_URL` is set correctly in your `.env` file, then run:
 
 ```bash
 npm run db:generate
 ```
 
-This regenerates the Prisma client. Always run `db:generate` after any schema change or after cloning the project for the first time.
+This regenerates the Prisma client. It runs automatically during `npm install`, but you may need to run it manually after schema changes.
 
 ---
 
@@ -458,12 +479,11 @@ The project includes comprehensive integration test suites that run against a li
 **Prerequisites:** The dev server must be running (`npm run dev`) and the database must be seeded (`npm run db:seed`).
 
 ```bash
-npm test                             # Run all test suites
-npm run test:auth                    # Authentication tests
-npm run test:admin                   # Admin module tests
-npm run test:full                    # User management & auth tests
-npx tsx tests/employee.test.ts       # Employee module tests
-npx tsx tests/manager.test.ts        # Manager module tests
+npm test                             # Run all 4 test suites (153 tests)
+npm run test:auth                    # Authentication tests (36 tests)
+npm run test:admin                   # Admin module tests (49 tests)
+npx tsx tests/employee.test.ts       # Employee module tests (38 tests)
+npx tsx tests/manager.test.ts        # Manager module tests (30 tests)
 ```
 
 ---
@@ -482,8 +502,9 @@ npx tsx tests/manager.test.ts        # Manager module tests
 | `npm run db:push`     | Push schema changes directly without creating a migration |
 | `npm run db:seed`     | Seed the database with demo data                          |
 | `npm run db:studio`   | Open Prisma Studio (visual database browser)              |
+| `npm test`            | Run all integration test suites                           |
 
 
 ---
 
-*© 2025 Almnfthen Business Services. All rights reserved.*
+*© 2026 Almnfthen Business Services. All rights reserved.*
