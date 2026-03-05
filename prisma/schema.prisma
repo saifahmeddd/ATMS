@@ -1,0 +1,285 @@
+// Prisma schema for TMS - Almnfthen Training Management System
+// Data Dictionary from FYP + extended tables (Notification, Certificate, UserProgress, AuditLog)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============== Enums ==============
+
+enum Role {
+  ADMIN
+  MANAGER
+  EMPLOYEE
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum CourseStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ModuleType {
+  VIDEO
+  PDF
+  DOCUMENT
+}
+
+enum EnrollmentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum NotificationType {
+  APPROVAL
+  REJECTION
+  REMINDER
+  CERTIFICATE
+  GENERAL
+}
+
+// ============== Core Tables ==============
+
+model User {
+  id           String     @id @default(cuid())
+  name         String
+  email        String     @unique
+  passwordHash String     @map("password_hash")
+  role         Role
+  status            UserStatus @default(ACTIVE)
+  phone             String?
+  profilePicture    String?    @map("profile_picture")
+  notificationPrefs Json?      @map("notification_prefs")
+  managerId         String?    @map("manager_id")
+  createdAt         DateTime   @default(now()) @map("created_at")
+
+  manager           User?            @relation("ManagerEmployees", fields: [managerId], references: [id], onDelete: SetNull)
+  managedEmployees  User[]           @relation("ManagerEmployees")
+
+  coursesCreated    Course[]         @relation("CourseCreator")
+  enrollments       Enrollment[]
+  approvedEnrollments Enrollment[]   @relation("ApprovedEnrollments")
+  notifications     Notification[]
+  auditLogs         AuditLog[]
+  passwordResetTokens PasswordResetToken[]
+
+  @@index([email])
+  @@index([role])
+  @@index([managerId])
+  @@map("users")
+}
+
+model Course {
+  id            String       @id @default(cuid())
+  title         String
+  description   String?
+  thumbnailUrl  String?      @map("thumbnail_url")
+  status        CourseStatus @default(DRAFT)
+  category      String?
+  createdById   String       @map("created_by")
+  createdAt     DateTime     @default(now()) @map("created_at")
+
+  createdBy     User         @relation("CourseCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  modules       Module[]
+  enrollments   Enrollment[]
+  prerequisites CoursePrerequisite[] @relation("CoursePrereqs")
+  prerequisiteOf CoursePrerequisite[] @relation("PrereqOf")
+
+  @@index([status])
+  @@index([createdById])
+  @@map("courses")
+}
+
+model Module {
+  id         String     @id @default(cuid())
+  courseId   String     @map("course_id")
+  title      String
+  type       ModuleType
+  contentUrl String     @map("content_url")
+  sequence   Int        @default(0)
+
+  course       Course      @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  quiz         Quiz?
+  userProgress UserProgress[]
+
+  @@index([courseId])
+  @@map("modules")
+}
+
+model Quiz {
+  id               String  @id @default(cuid())
+  moduleId         String  @unique @map("module_id")
+  passingScore     Int     @map("passing_score") // 0-100 percentage
+  durationMinutes  Int     @map("duration_minutes")
+  maxAttempts      Int     @default(3) @map("max_attempts")
+
+  module    Module    @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  questions Question[]
+  quizResults QuizResult[]
+
+  @@map("quizzes")
+}
+
+model Question {
+  id           String  @id @default(cuid())
+  quizId       String  @map("quiz_id")
+  questionText String  @map("question_text")
+  options      Json    // Array of option strings
+  correctAnswer String @map("correct_answer")
+  explanation  String? // Optional justification shown after quiz completion (FR-4.7)
+
+  quiz Quiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  @@index([quizId])
+  @@map("questions")
+}
+
+model Enrollment {
+  id            String           @id @default(cuid())
+  userId        String           @map("user_id")
+  courseId      String           @map("course_id")
+  status        EnrollmentStatus @default(PENDING)
+  progressPct   Int              @default(0) @map("progress_pct")
+  enrolledAt    DateTime         @default(now()) @map("enrolled_at")
+  approvedById  String?          @map("approved_by")
+  deadline      DateTime?
+  comment       String?
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course     Course     @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  approvedBy User?      @relation("ApprovedEnrollments", fields: [approvedById], references: [id], onDelete: SetNull)
+
+  quizResults   QuizResult[]
+  userProgress  UserProgress[]
+  certificate   Certificate?
+
+  @@unique([userId, courseId])
+  @@index([userId])
+  @@index([courseId])
+  @@index([status])
+  @@map("enrollments")
+}
+
+model QuizResult {
+  id           String   @id @default(cuid())
+  enrollmentId String   @map("enrollment_id")
+  quizId       String   @map("quiz_id")
+  score        Int
+  passed       Boolean
+  answers      Json?
+  completedAt  DateTime @default(now()) @map("completed_at")
+
+  enrollment Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  quiz       Quiz       @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  @@index([enrollmentId])
+  @@index([quizId])
+  @@map("quiz_results")
+}
+
+model CoursePrerequisite {
+  id                   String @id @default(cuid())
+  courseId              String @map("course_id")
+  prerequisiteCourseId String @map("prerequisite_course_id")
+
+  course              Course @relation("CoursePrereqs", fields: [courseId], references: [id], onDelete: Cascade)
+  prerequisiteCourse  Course @relation("PrereqOf", fields: [prerequisiteCourseId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, prerequisiteCourseId])
+  @@index([courseId])
+  @@index([prerequisiteCourseId])
+  @@map("course_prerequisites")
+}
+
+// ============== Extended Tables ==============
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String           @map("user_id")
+  title     String
+  body      String?
+  read      Boolean          @default(false)
+  type      NotificationType @default(GENERAL)
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([read])
+  @@map("notifications")
+}
+
+model Certificate {
+  id               String   @id @default(cuid())
+  enrollmentId     String   @unique @map("enrollment_id")
+  verificationCode String   @unique @map("verification_code")
+  issuedAt         DateTime @default(now()) @map("issued_at")
+
+  enrollment Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+
+  @@map("certificates")
+}
+
+model UserProgress {
+  id            String    @id @default(cuid())
+  enrollmentId  String    @map("enrollment_id")
+  moduleId      String    @map("module_id")
+  videoProgress Int       @default(0) @map("video_progress")
+  lastPosition  Int       @default(0) @map("last_position")
+  startedAt     DateTime  @default(now()) @map("started_at")
+  completedAt   DateTime? @map("completed_at")
+
+  enrollment Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  module     Module     @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@unique([enrollmentId, moduleId])
+  @@index([enrollmentId])
+  @@index([moduleId])
+  @@map("user_progress")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tokenHash])
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?  @map("user_id")
+  action    String
+  entity    String
+  entityId  String?  @map("entity_id")
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([entity, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
