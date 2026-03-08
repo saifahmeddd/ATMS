@@ -3,17 +3,13 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import dynamic from "next/dynamic";
 import {
   PlayCircle, FileText, Award, CheckCircle2, ChevronLeft,
-  ChevronRight, Lock
+  ChevronRight, Lock, ExternalLink
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
-
-import type ReactPlayerType from "react-player";
-const ReactPlayer = dynamic(() => import("react-player"), { ssr: false }) as unknown as typeof ReactPlayerType;
 
 interface ModuleProgress {
   moduleId: string;
@@ -43,7 +39,6 @@ export default function CoursePlayerPage() {
   const [activeIdx, setActiveIdx] = useState(0);
   const [loading, setLoading] = useState(true);
   const [marking, setMarking] = useState(false);
-  const playerRef = useRef<{ getCurrentTime: () => number } | null>(null);
   const autoSaveRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchProgress = useCallback(async () => {
@@ -102,35 +97,11 @@ export default function CoursePlayerPage() {
     };
   }, []);
 
-  useEffect(() => {
-    if (autoSaveRef.current) clearInterval(autoSaveRef.current);
-    if (!data) return;
-    const mod = data.modules[activeIdx];
-    if (mod.type === "VIDEO") {
-      autoSaveRef.current = setInterval(() => {
-        if (playerRef.current) {
-          const seconds = Math.floor(playerRef.current.getCurrentTime());
-          saveProgress(undefined, seconds);
-        }
-      }, 10000);
-    }
-    return () => {
-      if (autoSaveRef.current) clearInterval(autoSaveRef.current);
-    };
-  }, [data, activeIdx, saveProgress]);
-
   const handleMarkComplete = async () => {
     setMarking(true);
     await saveProgress(100, undefined, true);
     await fetchProgress();
     setMarking(false);
-  };
-
-  const handleVideoProgress = (state: { played: number }) => {
-    const pct = Math.round(state.played * 100);
-    if (pct >= 95 && data && !data.modules[activeIdx].completed) {
-      handleMarkComplete();
-    }
   };
 
   const isUnlocked = (idx: number): boolean => {
@@ -211,38 +182,23 @@ export default function CoursePlayerPage() {
 
         {/* Main Content */}
         <div className="flex-1 flex flex-col bg-card rounded-lg border overflow-hidden">
-          {current.type === "VIDEO" ? (
-            <div className="flex-1 bg-gradient-to-br from-muted to-secondary relative">
-              <ReactPlayer
-                ref={(p: unknown) => { playerRef.current = p as { getCurrentTime: () => number } | null; }}
-                url={(current as ModuleProgress & { contentUrl?: string }).contentUrl || ""}
-                width="100%"
-                height="100%"
-                controls
-                onProgress={handleVideoProgress}
-                config={{
-                  youtube: { playerVars: { start: current.lastPosition } },
-                }}
-              />
+          <div className="flex-1 flex items-center justify-center bg-secondary/30">
+            <div className="text-center space-y-3">
+              {current.type === "VIDEO"
+                ? <PlayCircle className="w-16 h-16 text-primary/50 mx-auto" />
+                : <FileText className="w-16 h-16 text-warning/50 mx-auto" />}
+              <p className="text-lg font-semibold text-foreground">{current.title}</p>
+              <p className="text-sm text-muted-foreground">{current.type} content</p>
+              {current.contentUrl && (
+                <a href={current.contentUrl} target="_blank" rel="noopener noreferrer">
+                  <Button variant="outline">
+                    <ExternalLink className="w-4 h-4 mr-1" />
+                    Open {current.type === "VIDEO" ? "Video" : current.type}
+                  </Button>
+                </a>
+              )}
             </div>
-          ) : (
-            <div className="flex-1 flex items-center justify-center bg-secondary/30">
-              <div className="text-center space-y-3">
-                <FileText className="w-16 h-16 text-warning/50 mx-auto" />
-                <p className="text-lg font-semibold text-foreground">{current.title}</p>
-                <p className="text-sm text-muted-foreground">{current.type} content</p>
-                {(current as ModuleProgress & { contentUrl?: string }).contentUrl && (
-                  <a
-                    href={(current as ModuleProgress & { contentUrl?: string }).contentUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <Button variant="outline"><FileText className="w-4 h-4 mr-1" /> Open {current.type}</Button>
-                  </a>
-                )}
-              </div>
-            </div>
-          )}
+          </div>
 
           <div className="p-4 border-t flex items-center justify-between">
             <div>
@@ -256,11 +212,9 @@ export default function CoursePlayerPage() {
                 <ChevronLeft className="w-4 h-4 mr-1" /> Previous
               </Button>
               {!current.completed ? (
-                current.type !== "VIDEO" ? (
-                  <Button size="sm" onClick={handleMarkComplete} disabled={marking}>
-                    <CheckCircle2 className="w-4 h-4 mr-1" /> {marking ? "Saving..." : "Mark Complete"}
-                  </Button>
-                ) : null
+                <Button size="sm" onClick={handleMarkComplete} disabled={marking}>
+                  <CheckCircle2 className="w-4 h-4 mr-1" /> {marking ? "Saving..." : "Mark Complete"}
+                </Button>
               ) : (
                 <span className="text-xs text-success flex items-center gap-1 px-3"><CheckCircle2 className="w-4 h-4" /> Completed</span>
               )}
