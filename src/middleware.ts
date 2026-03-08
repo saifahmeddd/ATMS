@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
-import { getToken } from "next-auth/jwt";
+import { auth } from "@/auth";
 
 const publicPaths = ["/", "/login", "/forgot-password", "/reset-password"];
 const authApiPath = "/api/auth";
 
-export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+export default auth((req) => {
+  const { pathname } = req.nextUrl;
 
   // Allow public paths
   if (publicPaths.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
@@ -28,22 +27,18 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const token = await getToken({
-    req: request,
-    secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
-  });
+  const session = req.auth;
 
-  if (!token) {
-    // API routes should return 401 JSON, not a redirect to login page
+  if (!session) {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const url = new URL("/login", request.url);
+    const url = new URL("/login", req.url);
     url.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(url);
   }
 
-  const role = token.role as string;
+  const role = session.user.role as string;
   const basePath = pathname.split("/")[1];
 
   // Role-based redirect: if user visits root dashboard, redirect to role-specific path
@@ -54,32 +49,25 @@ export async function middleware(request: NextRequest) {
       EMPLOYEE: "/employee",
     };
     const redirectTo = rolePaths[role] ?? "/dashboard";
-    return NextResponse.redirect(new URL(redirectTo, request.url));
+    return NextResponse.redirect(new URL(redirectTo, req.url));
   }
 
   // Protect role-specific routes
   if (basePath === "admin" && role !== "ADMIN") {
-    return NextResponse.redirect(new URL("/login", request.url));
+    return NextResponse.redirect(new URL("/login", req.url));
   }
   if (basePath === "manager" && role !== "MANAGER") {
-    return NextResponse.redirect(new URL("/login", request.url));
+    return NextResponse.redirect(new URL("/login", req.url));
   }
   if (basePath === "employee" && role !== "EMPLOYEE") {
-    return NextResponse.redirect(new URL("/login", request.url));
+    return NextResponse.redirect(new URL("/login", req.url));
   }
 
   return NextResponse.next();
-}
+});
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public files (images, etc.)
-     */
     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
