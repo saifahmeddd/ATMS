@@ -1,51 +1,38 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { useState, Suspense } from "react";
+import { useState, Suspense, useEffect } from "react";
 import Link from "next/link";
 import { GraduationCap, Eye, EyeOff } from "lucide-react";
+import { authenticate } from "./actions";
 
 function LoginForm() {
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") ?? "/dashboard";
+  const urlError = searchParams.get("error");
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    if (urlError === "CredentialsSignin") {
+      setError("Invalid email or password");
+    }
+  }, [urlError]);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setLoading(true);
     try {
-      const res = await fetch("/api/auth/csrf");
-      const { csrfToken } = await res.json();
-
-      const signInRes = await fetch("/api/auth/callback/credentials", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ email, password, csrfToken, callbackUrl }),
-        redirect: "follow",
-      });
-
-      const session = await fetch("/api/auth/session");
-      const sessionData = await session.json();
-
-      if (sessionData?.user) {
-        const role = sessionData.user.role as string;
-        const rolePaths: Record<string, string> = {
-          ADMIN: "/admin",
-          MANAGER: "/manager",
-          EMPLOYEE: "/employee",
-        };
-        window.location.href = rolePaths[role] ?? "/dashboard";
-      } else {
-        setError("Invalid email or password");
+      const result = await authenticate(email, password);
+      if (result) {
+        setError(result);
+        setLoading(false);
       }
     } catch {
       setError("Something went wrong. Please try again.");
-    } finally {
       setLoading(false);
     }
   }
