@@ -1,40 +1,80 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
+import { auth } from "@/auth";
 
 export async function GET(req: NextRequest) {
   const cookies = req.cookies.getAll();
-  const cookieNames = cookies.map((c) => c.name);
+  const cookieInfo = cookies.map((c) => ({
+    name: c.name,
+    length: c.value.length,
+  }));
 
   const forwardedProto = req.headers.get("x-forwarded-proto");
-  const forwardedHost = req.headers.get("x-forwarded-host");
   const host = req.headers.get("host");
 
-  let token = null;
-  let tokenError = null;
+  // Method 1: getToken (what the middleware uses)
+  let getTokenResult = null;
+  let getTokenError = null;
   try {
-    token = await getToken({
+    const t = await getToken({
       req,
       secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
     });
+    getTokenResult = t ? { id: t.id, role: t.role } : null;
   } catch (e: unknown) {
-    tokenError = e instanceof Error ? e.message : String(e);
+    getTokenError = e instanceof Error ? e.message : String(e);
+  }
+
+  // Method 1b: getToken with explicit salt
+  let getTokenExplicit = null;
+  let getTokenExplicitError = null;
+  try {
+    const t = await getToken({
+      req,
+      secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+      salt: "__Secure-authjs.session-token",
+    });
+    getTokenExplicit = t ? { id: t.id, role: t.role } : null;
+  } catch (e: unknown) {
+    getTokenExplicitError = e instanceof Error ? e.message : String(e);
+  }
+
+  // Method 1c: getToken with non-secure cookie name
+  let getTokenNonSecure = null;
+  try {
+    const t = await getToken({
+      req,
+      secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+      salt: "authjs.session-token",
+      secureCookie: false,
+    });
+    getTokenNonSecure = t ? { id: t.id, role: t.role } : null;
+  } catch {
+    // ignore
+  }
+
+  // Method 2: auth() (NextAuth's own session reader)
+  let authSession = null;
+  let authError = null;
+  try {
+    const session = await auth();
+    authSession = session ? { user: session.user } : null;
+  } catch (e: unknown) {
+    authError = e instanceof Error ? e.message : String(e);
   }
 
   return NextResponse.json({
     env: {
       AUTH_SECRET_SET: !!process.env.AUTH_SECRET,
-      NEXTAUTH_SECRET_SET: !!process.env.NEXTAUTH_SECRET,
+      AUTH_SECRET_LENGTH: (process.env.AUTH_SECRET ?? "").length,
       AUTH_URL: process.env.AUTH_URL ?? "(not set)",
-      NEXTAUTH_URL: process.env.NEXTAUTH_URL ?? "(not set)",
       NODE_ENV: process.env.NODE_ENV,
     },
-    headers: {
-      "x-forwarded-proto": forwardedProto,
-      "x-forwarded-host": forwardedHost,
-      host,
-    },
-    cookies: cookieNames,
-    token: token ? { id: token.id, role: token.role, exp: token.exp } : null,
-    tokenError,
+    headers: { "x-forwarded-proto": forwardedProto, host },
+    cookies: cookieInfo,
+    getToken: { result: getTokenResult, error: getTokenError },
+    getTokenExplicitSalt: { result: getTokenExplicit, error: getTokenExplicitError },
+    getTokenNonSecure: { result: getTokenNonSecure },
+    authSession: { result: authSession, error: authError },
   });
 }
