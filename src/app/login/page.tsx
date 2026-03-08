@@ -1,6 +1,5 @@
 "use client";
 
-import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { useState, Suspense } from "react";
 import Link from "next/link";
@@ -20,19 +19,32 @@ function LoginForm() {
     setError("");
     setLoading(true);
     try {
-      const result = await signIn("credentials", {
-        email,
-        password,
-        redirect: false,
-        callbackUrl,
+      const res = await fetch("/api/auth/csrf");
+      const { csrfToken } = await res.json();
+
+      const signInRes = await fetch("/api/auth/callback/credentials", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ email, password, csrfToken, callbackUrl }),
+        redirect: "follow",
       });
-      if (result?.error) {
+
+      const session = await fetch("/api/auth/session");
+      const sessionData = await session.json();
+
+      if (sessionData?.user) {
+        const role = sessionData.user.role as string;
+        const rolePaths: Record<string, string> = {
+          ADMIN: "/admin",
+          MANAGER: "/manager",
+          EMPLOYEE: "/employee",
+        };
+        window.location.href = rolePaths[role] ?? "/dashboard";
+      } else {
         setError("Invalid email or password");
-        return;
       }
-      if (result?.ok) {
-        window.location.href = callbackUrl;
-      }
+    } catch {
+      setError("Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
