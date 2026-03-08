@@ -1,38 +1,39 @@
 "use client";
 
+import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
-import { useState, Suspense, useEffect } from "react";
+import { useState, Suspense } from "react";
 import Link from "next/link";
 import { GraduationCap, Eye, EyeOff } from "lucide-react";
-import { authenticate } from "./actions";
 
 function LoginForm() {
   const searchParams = useSearchParams();
-  const urlError = searchParams.get("error");
+  const callbackUrl = searchParams.get("callbackUrl") ?? "/dashboard";
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (urlError === "CredentialsSignin") {
-      setError("Invalid email or password");
-    }
-  }, [urlError]);
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setLoading(true);
     try {
-      const result = await authenticate(email, password);
-      if (result) {
-        setError(result);
-        setLoading(false);
+      const result = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
+        callbackUrl,
+      });
+      if (result?.error) {
+        setError("Invalid email or password");
+        return;
       }
-    } catch {
-      setError("Something went wrong. Please try again.");
+      if (result?.ok) {
+        window.location.href = callbackUrl;
+      }
+    } finally {
       setLoading(false);
     }
   }
