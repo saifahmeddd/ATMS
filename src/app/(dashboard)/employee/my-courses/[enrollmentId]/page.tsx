@@ -13,7 +13,7 @@ import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 import type ReactPlayerType from "react-player";
-const ReactPlayer = dynamic(() => import("react-player"), { ssr: false }) as typeof ReactPlayerType;
+const ReactPlayer = dynamic(() => import("react-player"), { ssr: false }) as unknown as typeof ReactPlayerType;
 
 interface ModuleProgress {
   moduleId: string;
