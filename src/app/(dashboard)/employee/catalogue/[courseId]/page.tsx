@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -49,15 +49,15 @@ export default function CourseDetailPage() {
   const [loading, setLoading] = useState(true);
   const [enrolling, setEnrolling] = useState(false);
 
-  const fetchCourse = async () => {
+  const fetchCourse = useCallback(async () => {
     const res = await fetch(`/api/employee/catalogue/${courseId}`);
     if (res.ok) setCourse(await res.json());
     setLoading(false);
-  };
+  }, [courseId]);
 
   useEffect(() => {
     fetchCourse();
-  }, [courseId]);
+  }, [fetchCourse]);
 
   const handleEnroll = async () => {
     setEnrolling(true);

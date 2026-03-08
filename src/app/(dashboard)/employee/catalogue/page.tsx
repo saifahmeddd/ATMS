@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { Search, BookOpen, Clock, Users } from "lucide-react";
 
@@ -23,7 +23,7 @@ export default function CourseCataloguePage() {
   const [loading, setLoading] = useState(true);
   const [enrolling, setEnrolling] = useState<string | null>(null);
 
-  const fetchCourses = async () => {
+  const fetchCourses = useCallback(async () => {
     const params = new URLSearchParams();
     if (search) params.set("search", search);
     if (categoryFilter !== "All") params.set("category", categoryFilter);
@@ -33,11 +33,11 @@ export default function CourseCataloguePage() {
     setCourses(data.courses);
     setCategories(data.categories ?? []);
     setLoading(false);
-  };
+  }, [search, categoryFilter]);
 
   useEffect(() => {
     fetchCourses();
-  }, [search, categoryFilter]);
+  }, [fetchCourses]);
 
   const handleEnroll = async (courseId: string) => {
     setEnrolling(courseId);

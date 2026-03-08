@@ -213,7 +213,7 @@ export default function CoursePlayerPage() {
           {current.type === "VIDEO" ? (
             <div className="flex-1 bg-gradient-to-br from-muted to-secondary relative">
               <ReactPlayer
-                ref={(p: { getCurrentTime: () => number } | null) => { playerRef.current = p; }}
+                ref={(p: unknown) => { playerRef.current = p as { getCurrentTime: () => number } | null; }}
                 url={(current as ModuleProgress & { contentUrl?: string }).contentUrl || ""}
                 width="100%"
                 height="100%"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -70,6 +70,20 @@ export default function QuizPage() {
       });
   }, [quizId, enrollmentId]);
 
+  const handleSubmit = useCallback(async () => {
+    if (submitting) return;
+    setSubmitting(true);
+    const res = await fetch(`/api/employee/quiz/${quizId}/submit`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enrollmentId, answers }),
+    });
+    const data = await res.json();
+    setResult(data);
+    setSubmitted(true);
+    setSubmitting(false);
+  }, [submitting, quizId, enrollmentId, answers]);
+
   useEffect(() => {
     if (submitted || loading) return;
     const interval = setInterval(() => {
@@ -83,26 +97,12 @@ export default function QuizPage() {
       });
     }, 1000);
     return () => clearInterval(interval);
-  }, [submitted, loading]);
+  }, [submitted, loading, handleSubmit]);
 
   const formatTime = (s: number) => {
     const m = Math.floor(s / 60);
     const sec = s % 60;
     return `${m.toString().padStart(2, "0")}:${sec.toString().padStart(2, "0")}`;
-  };
-
-  const handleSubmit = async () => {
-    if (submitting) return;
-    setSubmitting(true);
-    const res = await fetch(`/api/employee/quiz/${quizId}/submit`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ enrollmentId, answers }),
-    });
-    const data = await res.json();
-    setResult(data);
-    setSubmitted(true);
-    setSubmitting(false);
   };
 
   const handleRetry = () => {
