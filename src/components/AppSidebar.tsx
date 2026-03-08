@@ -180,7 +180,7 @@ export default function AppSidebar({
         </Link>
         <button
           type="button"
-          onClick={() => signOut({ callbackUrl: "/login" })}
+          onClick={async () => { await signOut({ redirect: false }); window.location.href = "/login"; }}
           className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-sidebar-foreground/80 hover:bg-destructive/10 hover:text-destructive hover:translate-x-0.5 active:scale-[0.97] transition-all duration-200 w-full"
         >
           <LogOut className="w-5 h-5 shrink-0" />
