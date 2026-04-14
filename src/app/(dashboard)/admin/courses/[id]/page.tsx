@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Edit, BookOpen, HelpCircle, Clock, Target, RotateCcw } from "lucide-react";
 
@@ -46,8 +46,8 @@ interface Course {
   _count: { enrollments: number };
 }
 
-export default function CourseDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+export default function CourseDetailPage({ params }: { params: { id: string } }) {
+  const { id } = params;
   const router = useRouter();
   const [course, setCourse] = useState<Course | null>(null);
   const [loading, setLoading] = useState(true);
