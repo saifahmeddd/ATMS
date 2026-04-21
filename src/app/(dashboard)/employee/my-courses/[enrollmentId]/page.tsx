@@ -1,15 +1,32 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, Component, ReactNode } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import {
   PlayCircle, FileText, Award, CheckCircle2, ChevronLeft,
-  ChevronRight, Lock, ExternalLink
+  ChevronRight, Lock, ExternalLink, AlertCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
+
+// Dynamically import ReactPlayer to avoid SSR issues
+const ReactPlayer = dynamic(() => import("react-player/lazy"), { ssr: false });
+
+// Error boundary to catch any player-level crashes
+class PlayerErrorBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { hasError: boolean }> {
+  constructor(props: { children: ReactNode; fallback: ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() { return { hasError: true }; }
+  render() {
+    if (this.state.hasError) return this.props.fallback;
+    return this.props.children;
+  }
+}
 
 interface ModuleProgress {
   moduleId: string;
@@ -203,22 +220,65 @@ export default function CoursePlayerPage() {
 
         {/* Main Content */}
         <div className="flex-1 flex flex-col bg-card rounded-lg border overflow-hidden">
-          <div className="flex-1 flex items-center justify-center bg-secondary/30">
-            <div className="text-center space-y-3">
-              {current.type === "VIDEO"
-                ? <PlayCircle className="w-16 h-16 text-primary/50 mx-auto" />
-                : <FileText className="w-16 h-16 text-warning/50 mx-auto" />}
-              <p className="text-lg font-semibold text-foreground">{current.title}</p>
-              <p className="text-sm text-muted-foreground">{current.type} content</p>
-              {current.contentUrl && (
-                <a href={current.contentUrl} target="_blank" rel="noopener noreferrer">
-                  <Button variant="outline">
-                    <ExternalLink className="w-4 h-4 mr-1" />
-                    Open {current.type === "VIDEO" ? "Video" : current.type}
-                  </Button>
-                </a>
-              )}
-            </div>
+          <div className="flex-1 relative bg-black">
+            {current.type === "VIDEO" ? (
+              <PlayerErrorBoundary
+                fallback={
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-secondary/30 text-center p-6 space-y-3">
+                    <AlertCircle className="w-12 h-12 text-destructive/60" />
+                    <p className="font-semibold text-foreground">Could not load the video player</p>
+                    <p className="text-sm text-muted-foreground">The URL may be invalid or unsupported.</p>
+                    {current.contentUrl && (
+                      <a href={current.contentUrl} target="_blank" rel="noopener noreferrer">
+                        <Button variant="outline" size="sm"><ExternalLink className="w-4 h-4 mr-1" /> Open in browser</Button>
+                      </a>
+                    )}
+                  </div>
+                }
+              >
+                {current.contentUrl ? (
+                  <ReactPlayer
+                    key={current.moduleId}
+                    url={current.contentUrl}
+                    width="100%"
+                    height="100%"
+                    controls
+                    style={{ position: "absolute", top: 0, left: 0 }}
+                    config={{
+                      youtube: { playerVars: { modestbranding: 1, rel: 0 } },
+                    }}
+                    onError={() => {/* swallowed — boundary handles visible crash */}}
+                  />
+                ) : (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-secondary/30 text-center space-y-3">
+                    <PlayCircle className="w-16 h-16 text-muted-foreground/40" />
+                    <p className="text-sm text-muted-foreground">No video URL provided for this module.</p>
+                  </div>
+                )}
+              </PlayerErrorBoundary>
+            ) : current.type === "PDF" && current.contentUrl ? (
+              <iframe
+                key={current.moduleId}
+                src={current.contentUrl}
+                className="absolute inset-0 w-full h-full border-0"
+                title={current.title}
+                onError={() => {/* iframe errors are silent; fallback link is shown below */}}
+              />
+            ) : (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-secondary/30 text-center p-6 space-y-3">
+                <FileText className="w-16 h-16 text-warning/50" />
+                <p className="text-lg font-semibold text-foreground">{current.title}</p>
+                <p className="text-sm text-muted-foreground">{current.type} module</p>
+                {current.contentUrl && (
+                  <a href={current.contentUrl} target="_blank" rel="noopener noreferrer">
+                    <Button variant="outline">
+                      <ExternalLink className="w-4 h-4 mr-1" />
+                      Open {current.type}
+                    </Button>
+                  </a>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="p-4 border-t flex items-center justify-between">
