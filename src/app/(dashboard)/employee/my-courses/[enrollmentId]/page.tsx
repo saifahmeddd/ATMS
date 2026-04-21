@@ -117,7 +117,28 @@ export default function CoursePlayerPage() {
     return <div className="space-y-4"><div className="bg-card rounded-lg border h-[600px] animate-pulse" /></div>;
   }
 
-  const current = data.modules[activeIdx];
+  if (data.modules.length === 0) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <Link href="/employee/my-courses">
+            <Button variant="ghost" size="sm"><ChevronLeft className="w-4 h-4 mr-1" /> Back</Button>
+          </Link>
+          <h1 className="text-lg font-bold text-foreground">{data.courseTitle ?? "Course"}</h1>
+        </div>
+        <div className="bg-card rounded-lg border p-10 flex flex-col items-center justify-center text-center space-y-3">
+          <FileText className="w-12 h-12 text-muted-foreground/60" />
+          <p className="text-base font-semibold text-foreground">No content available yet</p>
+          <p className="text-sm text-muted-foreground max-w-md">
+            This course does not have any modules yet. Please check back later or contact your administrator.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const safeIdx = Math.min(Math.max(activeIdx, 0), data.modules.length - 1);
+  const current = data.modules[safeIdx];
   const completedCount = data.modules.filter((m) => m.completed).length;
   const progress = data.progressPct;
 
