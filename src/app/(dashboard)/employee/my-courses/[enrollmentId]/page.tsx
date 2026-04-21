@@ -239,14 +239,11 @@ export default function CoursePlayerPage() {
                 {current.contentUrl ? (
                   <ReactPlayer
                     key={current.moduleId}
-                    url={current.contentUrl}
+                    src={current.contentUrl}
                     width="100%"
                     height="100%"
                     controls
                     style={{ position: "absolute", top: 0, left: 0 }}
-                    config={{
-                      youtube: { playerVars: { modestbranding: 1, rel: 0 } },
-                    }}
                     onError={() => {/* swallowed — boundary handles visible crash */}}
                   />
                 ) : (
