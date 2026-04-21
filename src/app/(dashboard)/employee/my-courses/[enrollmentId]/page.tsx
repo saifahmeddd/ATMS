@@ -60,26 +60,11 @@ export default function CoursePlayerPage() {
 
   const fetchProgress = useCallback(async () => {
     const res = await fetch(`/api/employee/progress?enrollmentId=${enrollmentId}`);
-    if (!res.ok) return;
-    const prog = await res.json();
-
-    const enrollRes = await fetch(`/api/enrollments?limit=1`);
-    const enrollData = await enrollRes.json();
-    const thisEnrollment = enrollData.enrollments?.find((e: { id: string }) => e.id === enrollmentId);
-
-    const detailRes = await fetch(`/api/employee/catalogue/${thisEnrollment?.course?.id ?? ""}`);
-    let courseModules: { id: string; contentUrl: string }[] = [];
-    if (detailRes.ok) {
-      const detail = await detailRes.json();
-      courseModules = detail.modules ?? [];
-      prog.courseTitle = detail.title;
+    if (!res.ok) {
+      setLoading(false);
+      return;
     }
-
-    const contentMap = new Map(courseModules.map((m: { id: string; contentUrl: string }) => [m.id, m.contentUrl]));
-    prog.modules = prog.modules.map((m: ModuleProgress) => ({
-      ...m,
-      contentUrl: contentMap.get(m.moduleId) ?? "",
-    }));
+    const prog = await res.json();
 
     setData(prog);
     setLoading(false);
@@ -87,6 +72,21 @@ export default function CoursePlayerPage() {
     const firstIncomplete = prog.modules.findIndex((m: ModuleProgress) => !m.completed);
     if (firstIncomplete >= 0) setActiveIdx(firstIncomplete);
   }, [enrollmentId]);
+
+  // Transform known PDF hosts into embeddable URLs
+  const getEmbeddablePdfUrl = (url: string): string => {
+    if (!url) return url;
+    // Google Drive: /view or /edit → /preview
+    const driveMatch = url.match(/drive\.google\.com\/file\/d\/([^/]+)/);
+    if (driveMatch) {
+      return `https://drive.google.com/file/d/${driveMatch[1]}/preview`;
+    }
+    // Dropbox: ?dl=0 → ?raw=1 or use dl=1 for direct
+    if (url.includes("dropbox.com")) {
+      return url.replace(/[?&]dl=0/, "?raw=1").replace(/[?&]dl=1/, "?raw=1");
+    }
+    return url;
+  };
 
   useEffect(() => {
     fetchProgress();
@@ -254,13 +254,20 @@ export default function CoursePlayerPage() {
                 )}
               </PlayerErrorBoundary>
             ) : current.type === "PDF" && current.contentUrl ? (
-              <iframe
-                key={current.moduleId}
-                src={current.contentUrl}
-                className="absolute inset-0 w-full h-full border-0"
-                title={current.title}
-                onError={() => {/* iframe errors are silent; fallback link is shown below */}}
-              />
+              <div className="absolute inset-0 flex flex-col">
+                <iframe
+                  key={current.moduleId}
+                  src={getEmbeddablePdfUrl(current.contentUrl)}
+                  className="flex-1 w-full border-0 bg-white"
+                  title={current.title}
+                />
+                <div className="bg-secondary/30 px-3 py-2 border-t flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">If the PDF does not load above, open it directly:</span>
+                  <a href={current.contentUrl} target="_blank" rel="noopener noreferrer">
+                    <Button variant="outline" size="sm"><ExternalLink className="w-3.5 h-3.5 mr-1" /> Open PDF</Button>
+                  </a>
+                </div>
+              </div>
             ) : (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-secondary/30 text-center p-6 space-y-3">
                 <FileText className="w-16 h-16 text-warning/50" />

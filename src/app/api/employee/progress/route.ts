@@ -27,7 +27,13 @@ export async function GET(request: NextRequest) {
 
   const enrollment = await prisma.enrollment.findUnique({
     where: { id: enrollmentId },
-    select: { userId: true, courseId: true, status: true, progressPct: true },
+    select: {
+      userId: true,
+      courseId: true,
+      status: true,
+      progressPct: true,
+      course: { select: { title: true } },
+    },
   });
 
   if (!enrollment || enrollment.userId !== session.user.id) {
@@ -37,7 +43,14 @@ export async function GET(request: NextRequest) {
   const modules = await prisma.module.findMany({
     where: { courseId: enrollment.courseId },
     orderBy: { sequence: "asc" },
-    select: { id: true, title: true, type: true, sequence: true, quiz: { select: { id: true } } },
+    select: {
+      id: true,
+      title: true,
+      type: true,
+      sequence: true,
+      contentUrl: true,
+      quiz: { select: { id: true } },
+    },
   });
 
   const progress = await prisma.userProgress.findMany({
@@ -61,6 +74,7 @@ export async function GET(request: NextRequest) {
       title: m.title,
       type: m.type,
       sequence: m.sequence,
+      contentUrl: m.contentUrl,
       videoProgress: prog?.videoProgress ?? 0,
       lastPosition: prog?.lastPosition ?? 0,
       completed: !!prog?.completedAt,
@@ -75,6 +89,7 @@ export async function GET(request: NextRequest) {
     enrollmentId,
     status: enrollment.status,
     progressPct: enrollment.progressPct,
+    courseTitle: enrollment.course.title,
     modules: moduleProgress,
   });
 }
