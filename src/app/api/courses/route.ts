@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/auth-utils";
+import { requireAdmin, requireAuth } from "@/lib/auth-utils";
 
 const createCourseSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -12,12 +12,18 @@ const createCourseSchema = z.object({
 });
 
 /**
- * GET /api/courses - List courses (Admin only for now)
- * Query params: page, limit, status, category
+ * GET /api/courses - List courses (Admin + Manager)
+ * Query params: page, limit, status, category, search
  */
 export async function GET(request: NextRequest) {
-  const authResult = await requireAdmin();
+  const authResult = await requireAuth();
   if (authResult instanceof NextResponse) return authResult;
+
+  const session = authResult;
+  // Employees browse courses via /api/employee/catalogue — block them here
+  if (session.user.role === "EMPLOYEE") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const { searchParams } = new URL(request.url);
   const page = parseInt(searchParams.get("page") ?? "1", 10);
