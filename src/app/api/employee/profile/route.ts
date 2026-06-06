@@ -3,10 +3,16 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-utils";
 
+const customFieldSchema = z.object({
+  label: z.string().trim().min(1, "Field name is required").max(50),
+  value: z.string().trim().max(250),
+});
+
 const updateProfileSchema = z.object({
-  name: z.string().min(1).optional(),
-  phone: z.string().optional().nullable(),
+  name: z.string().trim().min(1).max(100).optional(),
+  phone: z.string().trim().max(30).optional().nullable(),
   profilePicture: z.string().optional().nullable(),
+  customFields: z.array(customFieldSchema).max(10).optional(),
 });
 
 export async function GET() {
@@ -23,6 +29,7 @@ export async function GET() {
       email: true,
       phone: true,
       profilePicture: true,
+      customFields: true,
       role: true,
       notificationPrefs: true,
       createdAt: true,
@@ -67,6 +74,7 @@ export async function PATCH(request: NextRequest) {
       email: true,
       phone: true,
       profilePicture: true,
+      customFields: true,
       role: true,
       notificationPrefs: true,
     },

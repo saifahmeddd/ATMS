@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { User, Mail, Phone } from "lucide-react";
+import { User, Mail, Phone, Plus, Trash2 } from "lucide-react";
+
+interface CustomField {
+  label: string;
+  value: string;
+}
 
 interface Profile {
   id: string;
@@ -9,6 +14,7 @@ interface Profile {
   email: string;
   phone: string | null;
   profilePicture: string | null;
+  customFields: CustomField[] | null;
   role: string;
   notificationPrefs: { email: boolean; inApp: boolean } | null;
 }
@@ -22,6 +28,7 @@ export default function EmployeeProfilePage() {
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [customFields, setCustomFields] = useState<CustomField[]>([]);
   const [currentPw, setCurrentPw] = useState("");
   const [newPw, setNewPw] = useState("");
   const [confirmPw, setConfirmPw] = useState("");
@@ -37,6 +44,7 @@ export default function EmployeeProfilePage() {
       setProfile(prof);
       setName(prof.name ?? "");
       setPhone(prof.phone ?? "");
+      setCustomFields(Array.isArray(prof.customFields) ? prof.customFields : []);
       setEmailPref(prefs.email ?? true);
       setInAppPref(prefs.inApp ?? true);
       setLoading(false);
@@ -44,27 +52,81 @@ export default function EmployeeProfilePage() {
   }, []);
 
   const handleSaveProfile = async () => {
-    setSaving(true);
-    setSaveMsg("");
-    const res = await fetch("/api/employee/profile", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, phone: phone || null }),
-    });
-    if (res.ok) {
-      const updated = await res.json();
-      setProfile((p) => (p ? { ...p, ...updated } : p));
-      setSaveMsg("Profile updated successfully");
+    if (!name.trim()) {
+      setSaveMsg("Full name is required");
+      return;
+    }
+    if (customFields.some((field) => !field.label.trim())) {
+      setSaveMsg("Every custom field needs a name");
+      return;
     }
 
-    await fetch("/api/employee/notification-preferences", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: emailPref, inApp: inAppPref }),
-    });
+    setSaving(true);
+    setSaveMsg("");
+    try {
+      const [profileRes, prefsRes] = await Promise.all([
+        fetch("/api/employee/profile", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: name.trim(),
+            phone: phone.trim() || null,
+            customFields: customFields.map((field) => ({
+              label: field.label.trim(),
+              value: field.value.trim(),
+            })),
+          }),
+        }),
+        fetch("/api/employee/notification-preferences", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: emailPref, inApp: inAppPref }),
+        }),
+      ]);
 
-    setSaving(false);
-    setTimeout(() => setSaveMsg(""), 3000);
+      if (!profileRes.ok || !prefsRes.ok) {
+        const error = !profileRes.ok
+          ? await profileRes.json().catch(() => null)
+          : await prefsRes.json().catch(() => null);
+        setSaveMsg(error?.error || "Failed to save changes");
+        return;
+      }
+
+      const updated = await profileRes.json();
+      setProfile((current) => current ? { ...current, ...updated } : current);
+      setName(updated.name ?? "");
+      setPhone(updated.phone ?? "");
+      setCustomFields(Array.isArray(updated.customFields) ? updated.customFields : []);
+      setSaveMsg("Profile updated successfully");
+    } catch {
+      setSaveMsg("Failed to save changes");
+    } finally {
+      setSaving(false);
+      setTimeout(() => setSaveMsg(""), 3000);
+    }
+  };
+
+  const addCustomField = () => {
+    if (customFields.length >= 10) return;
+    setCustomFields((fields) => [...fields, { label: "", value: "" }]);
+  };
+
+  const updateCustomField = (
+    index: number,
+    key: keyof CustomField,
+    value: string
+  ) => {
+    setCustomFields((fields) =>
+      fields.map((field, fieldIndex) =>
+        fieldIndex === index ? { ...field, [key]: value } : field
+      )
+    );
+  };
+
+  const removeCustomField = (index: number) => {
+    setCustomFields((fields) =>
+      fields.filter((_, fieldIndex) => fieldIndex !== index)
+    );
   };
 
   const handleChangePassword = async () => {
@@ -133,6 +195,19 @@ export default function EmployeeProfilePage() {
                 <Phone className="w-4 h-4" /> {profile.phone}
               </div>
             )}
+            {profile?.customFields?.map((field, index) => (
+              field.value ? (
+                <div
+                  key={`${field.label}-${index}`}
+                  className="flex items-start gap-2 text-muted-foreground"
+                >
+                  <span className="font-medium text-foreground">
+                    {field.label}:
+                  </span>
+                  <span className="break-words">{field.value}</span>
+                </div>
+              ) : null
+            ))}
           </div>
         </div>
 
@@ -170,6 +245,85 @@ export default function EmployeeProfilePage() {
             </div>
           </div>
 
+          <div className="mt-6">
+            <div className="flex items-center justify-between gap-4 mb-3">
+              <div>
+                <h3 className="font-medium text-foreground">
+                  Additional Information
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Add details such as job title, department, location, or skills.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={addCustomField}
+                disabled={customFields.length >= 10}
+                className="inline-flex items-center gap-2 px-3 py-2 border rounded-lg text-sm font-medium text-primary hover:bg-primary/5 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Plus className="w-4 h-4" />
+                Add field
+              </button>
+            </div>
+
+            {customFields.length === 0 ? (
+              <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                No additional fields yet. Add one to include more profile details.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {customFields.map((field, index) => (
+                  <div
+                    key={index}
+                    className="grid grid-cols-1 md:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)_auto] gap-3 items-end"
+                  >
+                    <div>
+                      <label className="text-sm text-foreground block mb-1">
+                        Field name
+                      </label>
+                      <input
+                        type="text"
+                        value={field.label}
+                        maxLength={50}
+                        onChange={(event) =>
+                          updateCustomField(index, "label", event.target.value)
+                        }
+                        placeholder="e.g. Job title"
+                        className="w-full px-3 py-2 text-sm bg-secondary border rounded-lg outline-none focus:ring-2 focus:ring-primary/20"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm text-foreground block mb-1">
+                        Value
+                      </label>
+                      <input
+                        type="text"
+                        value={field.value}
+                        maxLength={250}
+                        onChange={(event) =>
+                          updateCustomField(index, "value", event.target.value)
+                        }
+                        placeholder="Enter a value"
+                        className="w-full px-3 py-2 text-sm bg-secondary border rounded-lg outline-none focus:ring-2 focus:ring-primary/20"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeCustomField(index)}
+                      aria-label={`Remove ${field.label || "custom field"}`}
+                      className="h-10 w-10 inline-flex items-center justify-center rounded-lg border text-muted-foreground hover:text-destructive hover:border-destructive/40"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+                <p className="text-xs text-muted-foreground">
+                  {customFields.length}/10 additional fields
+                </p>
+              </div>
+            )}
+          </div>
+
           <h3 className="font-medium text-foreground mt-6 mb-3">Notification Preferences</h3>
           <div className="space-y-2">
             <label className="flex items-center gap-3 cursor-pointer">
@@ -190,7 +344,13 @@ export default function EmployeeProfilePage() {
             >
               {saving ? "Saving..." : "Save Changes"}
             </button>
-            {saveMsg && <span className="text-sm text-success">{saveMsg}</span>}
+            {saveMsg && (
+              <span className={`text-sm ${
+                saveMsg.includes("success") ? "text-success" : "text-destructive"
+              }`}>
+                {saveMsg}
+              </span>
+            )}
           </div>
         </div>
       </div>

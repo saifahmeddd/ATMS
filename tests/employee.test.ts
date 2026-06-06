@@ -531,13 +531,50 @@ async function runTests() {
   }
 
   {
+    const customFields = [
+      { label: "Job title", value: "Software Engineer" },
+      { label: "Location", value: "Kuala Lumpur" },
+    ];
     const res = await api("/api/employee/profile", employeeCookie, {
       method: "PATCH",
-      body: JSON.stringify({ name: "Updated Employee", phone: "+60123456789" }),
+      body: JSON.stringify({
+        name: "Updated Employee",
+        phone: "+60123456789",
+        customFields,
+      }),
     });
     const data = await res.json();
-    if (res.status === 200 && data.name === "Updated Employee" && data.phone === "+60123456789") ok("Update name and phone");
+    if (
+      res.status === 200 &&
+      data.name === "Updated Employee" &&
+      data.phone === "+60123456789" &&
+      data.customFields?.[0]?.label === "Job title" &&
+      data.customFields?.[1]?.value === "Kuala Lumpur"
+    ) ok("Update profile and custom fields");
     else fail("Update profile", `Status ${res.status}`);
+  }
+
+  {
+    const res = await api("/api/employee/profile", employeeCookie);
+    const data = await res.json();
+    if (
+      res.status === 200 &&
+      data.customFields?.length === 2 &&
+      data.customFields[0].value === "Software Engineer"
+    ) ok("Custom profile fields persist");
+    else fail("Custom profile field persistence", `Status ${res.status}`);
+  }
+
+  {
+    const res = await api("/api/employee/profile", employeeCookie, {
+      method: "PATCH",
+      body: JSON.stringify({ customFields: [{ label: "", value: "Invalid" }] }),
+    });
+    if (res.status === 400) ok("Reject custom field without a name");
+    else {
+      fail("Custom field validation", `Status ${res.status}`);
+      await res.json().catch(() => {});
+    }
   }
 
   // Notification preferences

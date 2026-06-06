@@ -63,6 +63,7 @@ model User {
   status            UserStatus @default(ACTIVE)
   phone             String?
   profilePicture    String?    @map("profile_picture")
+  customFields      Json?      @map("custom_fields")
   notificationPrefs Json?      @map("notification_prefs")
   managerId         String?    @map("manager_id")
   createdAt         DateTime   @default(now()) @map("created_at")
